@@ -1,0 +1,42 @@
+# Run once per reviewed schema release, before the Deployment rollout.
+# Deliberately excluded from kustomization.yaml to avoid accidental reruns.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tof-clinical-migrate-v1
+  namespace: tof-clinical
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tof-clinical
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migration
+          image: tof-clinical:local
+          imagePullPolicy: IfNotPresent
+          command: [python, -m, migrations.001_initial]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tof-clinical-database
+                  key: url
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}

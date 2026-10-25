@@ -1,0 +1,7 @@
+openmed[edge-sbc]==3.0.0
+fastapi==0.159.1
+uvicorn==0.54.0
+onnxruntime==1.31.0
+numpy==2.5.4
+tokenizers==0.23.3
+httpx==0.28.1

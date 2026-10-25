@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tof-clinical
+spec:
+  # Run migrate-job.yaml before first rollout. Scale after validating your
+  # database capacity, ingress, and deployment availability requirements.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tof-clinical
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tof-clinical
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ehr
+          # Push the Dockerfile image to your registry and replace using kustomize.
+          image: tof-clinical:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: tof-clinical
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tof-clinical-database
+                  key: url
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /readyz
+              port: http
+              httpHeaders: [{name: Host, value: localhost}]
+            periodSeconds: 3
+            failureThreshold: 40
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+              httpHeaders: [{name: Host, value: localhost}]
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+              httpHeaders: [{name: Host, value: localhost}]
+            periodSeconds: 20
+          volumeMounts:
+            - name: credentials
+              mountPath: /run/secrets/clinical
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: openmed-credential
+              mountPath: /run/secrets/openmed
+              readOnly: true
+            - name: utility-credentials
+              mountPath: /run/secrets/utility
+              readOnly: true
+            - name: utility-state
+              mountPath: /var/lib/tof-clinical/utility
+      volumes:
+        - name: credentials
+          secret:
+            secretName: tof-clinical-principals
+            defaultMode: 0440
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: openmed-credential
+          secret:
+            secretName: tof-clinical-openmed
+            defaultMode: 0440
+        - name: utility-credentials
+          secret:
+            secretName: tof-clinical-utility
+            optional: true
+            defaultMode: 0440
+        - name: utility-state
+          persistentVolumeClaim:
+            claimName: tof-clinical-utility-state

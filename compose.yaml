@@ -1,0 +1,91 @@
+name: tof-clinical
+services:
+  ehr:
+    build: .
+    image: tof-clinical:local
+    restart: unless-stopped
+    init: true
+    ports:
+      - "${EHR_BIND_ADDRESS:-127.0.0.1}:${EHR_PORT:-8090}:8080"
+    environment:
+      DATABASE_URL: postgresql+psycopg://clinical:${POSTGRES_PASSWORD:?Run scripts/bootstrap.ps1 first}@db:5432/clinical
+      DEMO_MODE: "true"
+      TOKEN_PRINCIPALS_FILE: /run/secrets/principals.json
+      EHR_ALLOWED_HOSTS: ${EHR_ALLOWED_HOSTS:-localhost,127.0.0.1,ehr,host.docker.internal}
+      EHR_ALLOWED_ORIGINS: ${EHR_ALLOWED_ORIGINS:-http://localhost:${EHR_PORT:-8090},http://127.0.0.1:${EHR_PORT:-8090}}
+      TZ: America/Los_Angeles
+      AI_SERVICE_URL: http://openmed:8081
+      AI_SERVICE_TOKEN_FILE: /run/secrets/openmed-token.txt
+      CLINICAL_ENTITIES_PROVIDER: utility-medium
+      UTILITY_INFERENCE_TOKEN_FILE: /run/secrets/utility/inference-key.txt
+      UTILITY_COMPUTE_TOKEN_FILE: /run/secrets/utility/compute-key.txt
+      UTILITY_STATE_DIR: /var/lib/tof-clinical/utility
+    volumes:
+      - ./.secrets/principals.json:/run/secrets/principals.json:ro
+      - ./.secrets/openmed-token.txt:/run/secrets/openmed-token.txt:ro
+      - ./.secrets/utility:/run/secrets/utility:ro
+      - utility-state:/var/lib/tof-clinical/utility
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    networks: [clinical, ai]
+  openmed:
+    build: ./clinical-ai
+    image: tof-clinical-openmed:local
+    restart: unless-stopped
+    init: true
+    environment:
+      AI_SERVICE_TOKEN_FILE: /run/secrets/openmed-token.txt
+      OPENMED_OFFLINE: "1"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+    volumes:
+      - openmed-models:/models:ro
+      - ./.secrets/openmed-token.txt:/run/secrets/openmed-token.txt:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 3g
+    cpus: 2
+    networks: [ai]
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: clinical
+      POSTGRES_USER: clinical
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/bootstrap.ps1 first}
+    volumes:
+      - clinical-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinical -d clinical"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [clinical]
+networks:
+  clinical:
+    driver: bridge
+  ai:
+    driver: bridge
+    internal: true
+volumes:
+  clinical-data:
+  utility-state:
+  openmed-models:
+    name: tof-clinical_openmed-models
+    external: true

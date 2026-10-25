@@ -1,0 +1,11 @@
+.git
+.env
+.secrets
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/*.db
+**/*.tsbuildinfo
+frontend/dist
+docs/design
+test-results

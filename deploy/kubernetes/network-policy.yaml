@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: clinical-boundary
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tof-clinical
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tof-ai-app
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tof-ai-app-test
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # utility-medium also needs HTTPS to ai.techoverfl.com and
+    # ops.ai.techoverfl.com. Add deployment-specific, destination-restricted
+    # rules (or a CNI FQDN policy) before verifying that connection. Standard
+    # NetworkPolicy has no FQDN selectors; this base does not allow all Internet
+    # traffic just to enable remote inference. OpenMed retains zero egress.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        # Same namespace only. Adapt this selector or use an explicit CIDR for
+        # your managed PostgreSQL service before rollout.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+      ports:
+        - {protocol: TCP, port: 5432}
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: tof-clinical-openmed
+      ports:
+        - {protocol: TCP, port: 8081}

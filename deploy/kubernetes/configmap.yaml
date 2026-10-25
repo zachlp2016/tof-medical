@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tof-clinical
+data:
+  DEMO_MODE: "false"
+  TOKEN_PRINCIPALS_FILE: /run/secrets/clinical/principals.json
+  EHR_ALLOWED_HOSTS: localhost,127.0.0.1,tof-clinical,tof-clinical.tof-clinical,tof-clinical.tof-clinical.svc.cluster.local
+  # Add the exact HTTPS origin when configuring your ingress. No wildcard origins.
+  EHR_ALLOWED_ORIGINS: "https://clinical.example.invalid"
+  TZ: America/Los_Angeles
+  AI_SERVICE_URL: http://tof-clinical-openmed:8081
+  AI_SERVICE_TOKEN_FILE: /run/secrets/openmed/token
+  CLINICAL_ENTITIES_PROVIDER: utility-medium
+  UTILITY_INFERENCE_TOKEN_FILE: /run/secrets/utility/inference-key.txt
+  UTILITY_COMPUTE_TOKEN_FILE: /run/secrets/utility/compute-key.txt
+  UTILITY_STATE_DIR: /var/lib/tof-clinical/utility

@@ -1,0 +1,12 @@
+.env
+.secrets/
+node_modules/
+frontend/dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+*.tsbuildinfo
+*.db
+.venv/
+test-results/
+playwright-report/

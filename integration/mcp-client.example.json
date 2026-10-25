@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tof-clinical": {
+      "url": "http://localhost:8090/mcp",
+      "headers": {
+        "Authorization": "Bearer <read-only-token-from-your-secret-store>"
+      }
+    }
+  }
+}
